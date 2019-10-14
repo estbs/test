@@ -6,6 +6,7 @@ namespace :spotify_task do
   task get_info: :environment do
   	puts 'running the method get_info from spotify_task'
   	getAuthorization()
+  	# ARTIST['artists']
   end
 
   def getAuthorization()
@@ -18,7 +19,7 @@ namespace :spotify_task do
   	if( responseRequest.status == 200 )
   		body_response = JSON.parse(responseRequest.body)
   		token = body_response['access_token']
-  		puts token
+  		getArtistInfo(token)
   	else
   		puts "Error in Authorization request"
   	end
@@ -44,6 +45,26 @@ namespace :spotify_task do
 		  req.headers['Authorization'] = authorization_value.delete!("\r\n\\")
 		  req.body = URI.encode_www_form(body_data)
 		end
+  end
+
+  def getArtistInfo(token)
+  	authorization_value = "Bearer " + token
+  	artist = ARTIST['artists'][1]
+  	url = "https://api.spotify.com/v1/search?"
+
+  	response = Faraday.get(url) do |req|
+  		req.params['q'] = artist
+  		req.params['type'] = 'artist'
+  		req.params['limit'] = 1
+		  req.headers['Authorization'] = authorization_value
+		end
+
+		if( response.status == 200 )
+			body_response = JSON.parse(response.body)
+		else
+		end
+
+		puts response.body
   end
 
 end
