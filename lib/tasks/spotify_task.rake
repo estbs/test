@@ -1,4 +1,5 @@
 require 'faraday'
+require 'json'
 
 namespace :spotify_task do
   desc "TODO"
@@ -14,7 +15,13 @@ namespace :spotify_task do
   	base64_value = getBase64(client_id, client_secret)
   	responseRequest = sendRequest(authorize_url, base64_value)
 
-  	puts "responseRequest: #{responseRequest}"
+  	if( responseRequest.status == 200 )
+  		body_response = JSON.parse(responseRequest.body)
+  		token = body_response['access_token']
+  		puts token
+  	else
+  		puts "Error in Authorization request"
+  	end
   end
 
   def getBase64(client_id, client_secret)
@@ -28,7 +35,15 @@ namespace :spotify_task do
 
   def sendRequest(url, base64_value)
   	authorization_value = "Basic " + base64_value
-  	Faraday.new(url, headers: { 'Content-Type' => 'application/x-www-form-urlencoded', 'Authorization' => authorization_value }).get
+  	body_data = {
+		  :grant_type => "client_credentials"
+		}
+
+  	response = Faraday.post(url) do |req|
+		  req.headers['Content-Type'] = 'application/x-www-form-urlencoded'
+		  req.headers['Authorization'] = authorization_value.delete!("\r\n\\")
+		  req.body = URI.encode_www_form(body_data)
+		end
   end
 
 end
