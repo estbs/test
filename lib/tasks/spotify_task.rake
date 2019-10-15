@@ -4,7 +4,7 @@ require 'json'
 namespace :spotify_task do
   desc "TODO"
   task get_info: :environment do
-  	puts 'running the method get_info from spotify_task'
+  	puts 'running the rake task spotify_task:get_info'
   	begin
 		  # 1. Get authorization
 			token = getTokenAuthorization()
@@ -12,15 +12,10 @@ namespace :spotify_task do
 		    raise ArgumentError
 		  end
 
-	  	getArtistInfo(token)
+	  	searchAndSaveArtistList(token)
 		rescue Exception => e
 		  puts "Error in request"
 		end
-  	
-
-  	
-  	# ARTIST['artists']
-
   end
 
   # Get the token by Spotify
@@ -29,13 +24,13 @@ namespace :spotify_task do
   	client_secret = '7bb1ea5e329a43d98b3957af976dd3eb'
   	authorize_url = 'https://accounts.spotify.com/api/token'
   	base64_value = getBase64(client_id, client_secret)
-  	responseRequest = sendAuthorizationRequest(authorize_url, base64_value)
+  	response_request = sendAuthorizationRequest(authorize_url, base64_value)
 
-  	if( responseRequest.status == 200 )
-  		body_response = JSON.parse(responseRequest.body)
-  		token = body_response['access_token']
+  	if( response_request.status == 200 )
+  		body_response = JSON.parse(response_request.body)
+  		token = body_response["access_token"]
   	else
-  		puts "Error in Authorization request"
+  		puts "Error in Authorization request with status code: #{response_request.status}"
   	end
   end
 
@@ -45,7 +40,7 @@ namespace :spotify_task do
   	begin 
 	    combination_base64 = Base64.encode64(combination_structure)
 	  rescue Exception => e 
-	    puts e 
+	    puts "Error trying to get base64 combination" 
 	  end
   end
 
@@ -64,41 +59,44 @@ namespace :spotify_task do
   end
 
   # Get the artist info from spotify
-  def getArtistInfo(token)
+  def searchAndSaveArtistList(token)
   	artists = []
   	url = "https://api.spotify.com/v1/search?"
   	authorization_value = "Bearer " + token
   	
-  	ARTIST['artists'].each do |artistName|
-  		puts "artistName: #{artistName}"
+  	ARTIST['artists'].each do |artist_name|
+  		puts "artistName: #{artist_name}"
   		# Send request based on artist name
-  		responseArtist = Faraday.get(url) do |req|
-	  		req.params['q'] = artistName
+  		response_artist = Faraday.get(url) do |req|
+	  		req.params['q'] = artist_name
 	  		req.params['type'] = 'artist'
 	  		req.params['limit'] = 1
 			  req.headers['Authorization'] = authorization_value
 			end
-
-			if( responseArtist.status == 200 )
-				body_responseArtist = JSON.parse(responseArtist.body)
-				artist_response = body_responseArtist["artists"]["items"][0]
-				artist = Artist.new(
-					name: artist_response["name"], 
-					image: artist_response["images"][0]["url"], 
-					genres: artist_response["genres"], 
-					popularity: artist_response["popularity"], 
-					spotify_id: artist_response["id"], 
-					spotify_url: artist_response["href"])
-				
-				artist.albums = getAlbumsInfoBySpotifyArtistId(artist["spotify_id"], token)
-				
-				if artist.save
-		      puts "#{artist["name"]} saved!"
-		    else
-		      puts "Error trying to save an artist"
-		    end
+			if( response_artist.status == 200 )
+				body_responseArtist = JSON.parse(response_artist.body)
+				if( body_responseArtist["artists"]["items"].length > 0 )
+					artist_response = body_responseArtist["artists"]["items"][0]
+					artist = Artist.new(
+						name: artist_response["name"], 
+						image: artist_response["images"][0]["url"], 
+						genres: artist_response["genres"], 
+						popularity: artist_response["popularity"], 
+						spotify_id: artist_response["id"], 
+						spotify_url: artist_response["href"])
+					
+					artist.albums = getAlbumsInfoBySpotifyArtistId(artist["spotify_id"], token)
+					
+					if artist.save
+			      puts "#{artist["name"]} saved!"
+			    else
+			      puts "Error trying to save an artist"
+			    end
+				else
+					puts "Empty items for artist: #{artist_name}"
+				end 
 			else
-				puts "Error in Artist request"
+				puts "Error in Artist request with status code: #{response_artist.status}"
 			end
 		end
   end
@@ -111,12 +109,12 @@ namespace :spotify_task do
   	authorization_value = "Bearer " + token
   	custom_url = url.gsub! '{id}', spotify_artist_id
 
-  	response_album = Faraday.get(custom_url) do |req|
+  	response_albums = Faraday.get(custom_url) do |req|
 		  req.headers['Authorization'] = authorization_value
 		end
 		
-		if( response_album.status == 200 )
-			body_response_album = JSON.parse(response_album.body)
+		if( response_albums.status == 200 )
+			body_response_album = JSON.parse(response_albums.body)
 
 			body_response_album["items"].each do |album_response|
 				album = Album.new(
@@ -128,10 +126,10 @@ namespace :spotify_task do
 				album.songs = getSongsInfoBySpotifyAlbumId(album["spotify_id"], token)
 				albums.push(album)
 			end
-			albums
 		else
-			puts "Error in Album request"
+			puts "Error in Album request with status code: #{response_albums.status}"
 		end
+		albums
   end
 
   def getSongsInfoBySpotifyAlbumId(spotify_album_id, token)
@@ -157,10 +155,10 @@ namespace :spotify_task do
 					spotify_id: song_response["id"])
 				songs.push(song)
 			end
-			songs
 		else
 			puts "Error in Songs request"
 		end
+		songs
   end
 
 end
