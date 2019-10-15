@@ -80,7 +80,7 @@ namespace :spotify_task do
 					artist = Artist.new(
 						name: artist_response["name"], 
 						image: artist_response["images"][0]["url"], 
-						genres: artist_response["genres"], 
+						genres: artist_response["genres"].join(','), 
 						popularity: artist_response["popularity"], 
 						spotify_id: artist_response["id"], 
 						spotify_url: artist_response["href"])
