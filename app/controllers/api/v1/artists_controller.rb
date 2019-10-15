@@ -8,7 +8,6 @@ class Api::V1::ArtistsController < ApplicationController
 
   # GET /artists/:id/albums
   def show
-  	puts "enter show"
   	artist = Artist.find(params[:id])
     albums = artist.albums
     render json: albums, status: :ok
